@@ -221,6 +221,18 @@ function scheduleViaSW() {
 }
 
 // ── FETCH ──────────────────────────────────────────────────
+function parseHourly(entries) {
+  const hourMap = {};
+  for (const entry of entries) {
+    const h = new Date(entry.DateTime).getHours();
+    if (!hourMap[h]) hourMap[h] = [];
+    hourMap[h].push(entry.PriceWithTax * 100); // EUR/kWh (sis. ALV) → snt/kWh
+  }
+  return Object.entries(hourMap)
+    .map(([h, vals]) => ({ hour: parseInt(h), spot: vals.reduce((a,b)=>a+b,0) / vals.length }))
+    .sort((a,b) => a.hour - b.hour);
+}
+
 async function fetchPrices() {
   const btn = document.getElementById('refresh-btn');
   btn.classList.add('spinning');
@@ -228,30 +240,16 @@ async function fetchPrices() {
   document.getElementById('status-bar').textContent = 'Haetaan hintatietoja...';
   try {
     const now = new Date();
+    const [todayRes, tomorrowRes] = await Promise.all([
+      fetch('https://api.spot-hinta.fi/Today'),
+      fetch('https://api.spot-hinta.fi/DayForward')
+    ]);
+    if (!todayRes.ok) throw new Error('HTTP ' + todayRes.status);
+    const todayData    = await todayRes.json();
+    const tomorrowData = tomorrowRes.ok ? await tomorrowRes.json() : [];
 
-    const todayStart  = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-    const tomorrowEnd = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 0, 0, 0);
-    const url = `https://sahkotin.fi/prices?fix&vat&start=${todayStart.toISOString()}&end=${tomorrowEnd.toISOString()}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const data = await res.json();
-
-    const localDate   = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-    const todayStr    = localDate(now);
-    const tn          = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
-    const tomorrowStr = localDate(tn);
-
-    const tMap = {}, tmMap = {};
-    for (const p of data.prices) {
-      const d = new Date(p.date);
-      const ds = localDate(d);
-      const h  = d.getHours();
-      if (ds === todayStr)         tMap[h]  = { hour: h, spot: p.value };
-      else if (ds === tomorrowStr) tmMap[h] = { hour: h, spot: p.value };
-    }
-    allData.today    = Object.values(tMap).sort((a,b)=>a.hour-b.hour);
-    allData.tomorrow = Object.values(tmMap).sort((a,b)=>a.hour-b.hour);
-
+    allData.today    = parseHourly(todayData);
+    allData.tomorrow = parseHourly(tomorrowData);
 
     document.getElementById('tab-tomorrow').textContent =
       allData.tomorrow.length ? 'Huomenna' : 'Huomenna (—)';
