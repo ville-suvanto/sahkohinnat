@@ -228,17 +228,17 @@ async function fetchPrices() {
   document.getElementById('status-bar').textContent = 'Haetaan hintatietoja...';
   try {
     const now = new Date();
-    const y = now.getFullYear();
-    const m = pad(now.getMonth()+1);
-    const d = pad(now.getDate());
-    const tm = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
-    const ty = tm.getFullYear();
-    const tm2 = pad(tm.getMonth()+1);
-    const td = pad(tm.getDate());
+    const y1 = now.getFullYear();
+    const m1 = pad(now.getMonth()+1);
+    const d1 = pad(now.getDate());
+    const tn = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
+    const y2 = tn.getFullYear();
+    const m2 = pad(tn.getMonth()+1);
+    const d2 = pad(tn.getDate());
 
     const [resToday, resTomorrow] = await Promise.allSettled([
-      fetch(`https://www.sahkonhintatanaan.fi/api/v1/prices/${y}/${m}-${d}.json`),
-      fetch(`https://www.sahkonhintatanaan.fi/api/v1/prices/${ty}/${tm2}-${td}.json`)
+      fetch(`https://www.sahkonhintatanaan.fi/api/v1/prices/${y1}/${m1}-${d1}.json`),
+      fetch(`https://www.sahkonhintatanaan.fi/api/v1/prices/${y2}/${m2}-${d2}.json`)
     ]);
 
     if (resToday.status === 'rejected' || !resToday.value.ok) throw new Error('HTTP ' + (resToday.value?.status || 'network'));
