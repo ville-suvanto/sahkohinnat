@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="fi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Sähköhinnat">
+<meta name="theme-color" content="#0f1117">
+<title>Sähköhinnat</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0f1117;--surface:#181b24;--surface2:#1e2130;--border:rgba(255,255,255,0.07);
+  --text:#f0f0f0;--muted:#6b7280;--green:#4ade80;--green-dim:rgba(74,222,128,0.12);
+  --red:#f87171;--red-dim:rgba(248,113,113,0.12);--amber:#fbbf24;--amber-dim:rgba(251,191,36,0.1);--accent:#818cf8;
+}
+html,body{background:var(--bg);color:var(--text);font-family:'Syne',sans-serif;min-height:100vh;overscroll-behavior:none}
+body{padding-bottom:env(safe-area-inset-bottom,20px)}
+header{position:sticky;top:0;z-index:10;background:var(--bg);padding:18px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.logo{font-size:18px;font-weight:700;letter-spacing:-0.02em}
+.logo span{color:var(--accent)}
+.header-right{display:flex;gap:8px;align-items:center}
+#notif-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);height:36px;padding:0 12px;border-radius:10px;display:flex;align-items:center;gap:6px;cursor:pointer;font-size:12px;font-family:'Syne',sans-serif;white-space:nowrap}
+#notif-btn.on{border-color:rgba(129,140,248,0.4);color:var(--accent)}
+#refresh-btn{background:var(--surface);border:1px solid var(--border);color:var(--muted);width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+#refresh-btn:active{transform:scale(0.94)}
+@keyframes spin{to{transform:rotate(360deg)}}
+#refresh-btn.spinning{animation:spin 0.8s linear infinite}
+.tabs{display:flex;gap:6px;padding:14px 20px 0}
+.tab{flex:1;padding:9px 0;font-family:'Syne',sans-serif;font-size:13px;font-weight:600;letter-spacing:0.03em;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:10px;cursor:pointer}
+.tab.active{background:var(--surface2);color:var(--text);border-color:rgba(255,255,255,0.15)}
+.stats{display:grid;grid-template-columns:1fr 1fr;gap:10px;padding:14px 20px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:14px 16px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:6px}
+.stat-value{font-family:'DM Mono',monospace;font-size:20px;font-weight:500}
+.stat-value.green{color:var(--green)}
+.stat-value.red{color:var(--red)}
+.stat-sub{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);margin-top:3px}
+/* Price info box */
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 20px 14px}
+.info-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.info-label{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+.info-value{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;color:var(--text)}
+.info-sub{font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);margin-top:2px}
+.notif-banner{display:none;margin:0 20px 14px;padding:12px 14px;background:rgba(129,140,248,0.1);border:1px solid rgba(129,140,248,0.25);border-radius:10px;font-size:13px;color:var(--accent)}
+.notif-banner button{margin-top:8px;padding:7px 14px;background:var(--accent);color:#0f1117;border:none;border-radius:8px;font-family:'Syne',sans-serif;font-size:12px;font-weight:600;cursor:pointer;width:100%}
+.chart-wrap{padding:0 20px 6px;position:relative;height:160px}
+canvas{display:block}
+.legend{display:flex;gap:12px;padding:0 20px 14px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.legend-dot{width:8px;height:8px;border-radius:2px;display:inline-block;margin-right:4px;vertical-align:middle}
+/* Toggle */
+.view-toggle{display:flex;gap:6px;padding:0 20px 14px}
+.toggle-btn{flex:1;padding:7px 0;font-family:'Syne',sans-serif;font-size:11px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:8px;cursor:pointer}
+.toggle-btn.active{background:var(--surface2);color:var(--text);border-color:rgba(255,255,255,0.15)}
+.section-title{font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--muted);padding:0 20px 10px}
+.hour-list{padding:0 20px}
+/* Hour row */
+.hour-row{border-radius:8px;margin-bottom:4px;overflow:hidden}
+.hour-row.cheap{border:1px solid rgba(74,222,128,0.18)}
+.hour-row.expensive{border:1px solid rgba(248,113,113,0.18)}
+.hour-row.current{outline:2px solid var(--amber);outline-offset:-1px}
+.hour-main{display:flex;align-items:center;gap:8px;padding:9px 10px;font-size:14px}
+.hour-row.cheap .hour-main{background:rgba(74,222,128,0.08)}
+.hour-row.expensive .hour-main{background:rgba(248,113,113,0.08)}
+.hour-time{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted);min-width:90px}
+.hour-prices{display:flex;flex-direction:column;flex:1;gap:1px}
+.hour-spot{font-family:'DM Mono',monospace;font-size:13px;color:var(--muted)}
+.hour-total{font-family:'DM Mono',monospace;font-size:15px;font-weight:500}
+.hour-total.green{color:var(--green)}
+.hour-total.red{color:var(--red)}
+.hour-diff{font-family:'DM Mono',monospace;font-size:11px;min-width:56px;text-align:right}
+.hour-diff.pos{color:var(--red)}
+.hour-diff.neg{color:var(--green)}
+.badge{font-size:10px;font-weight:600;letter-spacing:0.04em;text-transform:uppercase;padding:3px 7px;border-radius:6px}
+.badge-now{background:var(--amber-dim);color:var(--amber)}
+.badge-night{background:rgba(129,140,248,0.12);color:var(--accent);font-size:9px;padding:2px 5px;border-radius:4px}
+.status-bar{text-align:center;font-size:12px;color:var(--muted);padding:14px 20px 20px}
+.empty-state{text-align:center;padding:40px 20px;color:var(--muted);font-size:14px}
+.cheap-summary{padding:0 20px 4px;display:flex;flex-wrap:wrap;gap:8px}
+.cheap-chip{background:rgba(74,222,128,0.1);border:1px solid rgba(74,222,128,0.25);border-radius:10px;padding:8px 12px;display:flex;flex-direction:column;gap:2px;min-width:80px}
+.cheap-chip.current{outline:2px solid var(--amber);outline-offset:-1px}
+.cheap-chip-time{font-family:"DM Mono",monospace;font-size:13px;font-weight:500;color:var(--green)}
+.cheap-chip-price{font-family:"DM Mono",monospace;font-size:11px;color:var(--muted)}
+.cheap-chip-total{font-family:"DM Mono",monospace;font-size:10px;color:var(--muted)}
+#error-msg{display:none;margin:0 20px 14px;padding:12px 16px;background:var(--red-dim);border:1px solid rgba(248,113,113,0.2);border-radius:10px;color:var(--red);font-size:13px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">Sähkö<span>hinnat</span></div>
+  <div class="header-right">
+    <button id="notif-btn" onclick="toggleNotifications()">🔔 Ilmoitukset</button>
+    <button id="refresh-btn" onclick="fetchPrices()" title="Päivitä">↻</button>
+  </div>
+</header>
+
+<div class="notif-banner" id="notif-banner">
+  Saat joka aamu klo 7 ilmoituksen päivän halvimmista sähkötunneista.
+  <button onclick="requestNotifPermission()">Salli ilmoitukset</button>
+</div>
+
+<div class="tabs">
+  <button class="tab active" id="tab-today" onclick="showDay('today')">Tänään</button>
+  <button class="tab" id="tab-tomorrow" onclick="showDay('tomorrow')">Huomenna</button>
+</div>
+
+<div class="stats">
+  <div class="stat-card">
+    <div class="stat-label">Kokonaishinta nyt</div>
+    <div class="stat-value" id="stat-total">—</div>
+    <div class="stat-sub" id="stat-total-sub">snt/kWh</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-label">Halvin tunti (kok.)</div>
+    <div class="stat-value" id="stat-min">—</div>
+    <div class="stat-sub" id="stat-min-sub"></div>
+  </div>
+</div>
+
+<!-- Price breakdown info -->
+<div class="info-grid">
+  <div class="info-card">
+    <div class="info-label">Siirto päivä (07–22)</div>
+    <div class="info-value">6,41 snt/kWh</div>
+    <div class="info-sub">sis. ALV 25,5 %</div>
+  </div>
+  <div class="info-card">
+    <div class="info-label">Siirto yö (22–07)</div>
+    <div class="info-value">3,92 snt/kWh</div>
+    <div class="info-sub">sis. ALV 25,5 %</div>
+  </div>
+</div>
+
+<div id="error-msg"></div>
+<div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+<div class="legend">
+  <span><span class="legend-dot" style="background:#4ade80"></span>Halpa (alle keskim.)</span>
+  <span><span class="legend-dot" style="background:#f87171"></span>Kallis (yli keskim.)</span>
+  <span><span class="legend-dot" style="background:#818cf8;opacity:0.5"></span>Yösiirto</span>
+</div>
+
+<div class="view-toggle">
+  <button class="toggle-btn active" id="toggle-total" onclick="setView('total')">Kokonaishinta</button>
+  <button class="toggle-btn" id="toggle-spot" onclick="setView('spot')">Vain pörssihinta</button>
+</div>
+
+<div class="section-title">5 halvinta tuntia</div>
+<div id="cheap-list"></div>
+<div class="section-title" style="margin-top:16px">Kaikki tunnit</div>
+<div class="hour-list" id="hour-list"></div>
+<div class="status-bar" id="status-bar">Haetaan hintatietoja...</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+// ── HINNAT ─────────────────────────────────────────────────
+const CONTRACT   = 7.79;   // Oomi Jousto kiinteä hinta
+
+
+const VAT = 1.255; // ALV 25,5%
+const DAY_XFER_VAT  = parseFloat((5.11 * 1.255).toFixed(4));  // 6.4131 snt
+const NIGHT_XFER_VAT = parseFloat((3.12 * 1.255).toFixed(4)); // 3.9156 snt
+// Sähköveroa ei näytetä (sama kuin Gridio)
+
+function isNightHour(h) { return h < 7 || h >= 22; }
+function getXfer(h) { return isNightHour(h) ? NIGHT_XFER_VAT : DAY_XFER_VAT; }
+function getTotal(spotPrice, h) { return spotPrice + getXfer(h); }
+
+// ── STATE ──────────────────────────────────────────────────
+let allData    = { today: [], tomorrow: [] };
+let currentDay = 'today';
+let chartInstance = null;
+let swReg      = null;
+let viewMode   = 'total'; // 'total' | 'spot'
+
+function pad(n) { return String(n).padStart(2, '0'); }
+
+// ── SERVICE WORKER ─────────────────────────────────────────
+async function registerSW() {
+  if (!('serviceWorker' in navigator)) return;
+  try { swReg = await navigator.serviceWorker.register('./sw.js'); } catch(e) {}
+}
+
+// ── NOTIFICATIONS ──────────────────────────────────────────
+function updateNotifBtn() {
+  const btn = document.getElementById('notif-btn');
+  if (!('Notification' in window)) { btn.style.display = 'none'; return; }
+  if (Notification.permission === 'granted') {
+    btn.textContent = '🔔 Ilmoitukset päällä';
+    btn.classList.add('on');
+  } else {
+    btn.textContent = '🔔 Ilmoitukset';
+    btn.classList.remove('on');
+  }
+}
+function toggleNotifications() {
+  if (!('Notification' in window)) { alert('Selaimesi ei tue ilmoituksia.'); return; }
+  if (Notification.permission === 'granted') {
+    alert('Ilmoitukset ovat päällä ✅\nSaat joka aamu klo 7 halvimmat tunnit.');
+    return;
+  }
+  document.getElementById('notif-banner').style.display = 'block';
+}
+async function requestNotifPermission() {
+  const result = await Notification.requestPermission();
+  document.getElementById('notif-banner').style.display = 'none';
+  updateNotifBtn();
+  if (result === 'granted') {
+    scheduleViaSW();
+    if (swReg) swReg.showNotification('✅ Ilmoitukset aktivoitu!', {
+      body: 'Saat jatkossa joka aamu klo 7 halvimmat sähkötunnit.',
+      icon: 'https://em-content.zobj.net/source/apple/354/high-voltage_26a1.png', tag: 'test'
+    });
+  }
+}
+function scheduleViaSW() {
+  if (!swReg || !navigator.serviceWorker.controller) { setTimeout(scheduleViaSW, 1000); return; }
+  navigator.serviceWorker.controller.postMessage({ type: 'SCHEDULE_ALARM', targetHour: 7,  targetMinute: 0  });
+  navigator.serviceWorker.controller.postMessage({ type: 'SCHEDULE_ALARM', targetHour: 14, targetMinute: 30 });
+}
+
+// ── FETCH ──────────────────────────────────────────────────
+async function fetchPrices() {
+  const btn = document.getElementById('refresh-btn');
+  btn.classList.add('spinning');
+  document.getElementById('error-msg').style.display = 'none';
+  document.getElementById('status-bar').textContent = 'Haetaan hintatietoja...';
+  try {
+    const now = new Date();
+
+    const res = await fetch('https://api.porssisahko.net/v1/latest-prices.json');
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const data = await res.json();
+
+    const todayStr = now.toISOString().slice(0,10);
+    const tn = new Date(now.getFullYear(), now.getMonth(), now.getDate()+1);
+    const tomorrowStr = tn.toISOString().slice(0,10);
+
+    const tMap = {}, tmMap = {};
+    for (const p of data.prices) {
+      const start = new Date(p.startDate);
+      const ds = start.toISOString().slice(0,10);
+      const h  = start.getHours();
+      if (ds === todayStr)    tMap[h]  = { hour: h, spot: p.price };
+      else if (ds === tomorrowStr) tmMap[h] = { hour: h, spot: p.price };
+    }
+    allData.today    = Object.values(tMap).sort((a,b)=>a.hour-b.hour);
+    allData.tomorrow = Object.values(tmMap).sort((a,b)=>a.hour-b.hour);
+
+    if (!allData.today.length) throw new Error('Ei dataa');
+
+    document.getElementById('tab-tomorrow').textContent =
+      allData.tomorrow.length ? 'Huomenna' : 'Huomenna (—)';
+    document.getElementById('status-bar').textContent =
+      'Päivitetty ' + now.toLocaleTimeString('fi-FI', {hour:'2-digit',minute:'2-digit'});
+    renderDay(currentDay);
+    if (Notification.permission === 'granted') scheduleViaSW();
+  } catch(e) {
+    const err = document.getElementById('error-msg');
+    err.style.display = 'block';
+    err.textContent = 'Hintatietojen haku epäonnistui (' + e.message + '). Tarkista verkkoyhteytesi.';
+    document.getElementById('status-bar').textContent = '';
+  } finally {
+    btn.classList.remove('spinning');
+  }
+}
+
+// ── RENDER ─────────────────────────────────────────────────
+function setView(mode) {
+  viewMode = mode;
+  document.getElementById('toggle-total').classList.toggle('active', mode === 'total');
+  document.getElementById('toggle-spot').classList.toggle('active', mode === 'spot');
+  renderDay(currentDay);
+}
+
+function renderDay(day) {
+  const prices = allData[day];
+  if (!prices || !prices.length) {
+    document.getElementById('hour-list').innerHTML = '<div class="empty-state">Hintatietoja ei vielä saatavilla.</div>';
+    document.getElementById('cheap-list').innerHTML = '';
+    document.getElementById('stat-total').textContent = '—';
+    document.getElementById('stat-min').textContent = '—';
+    renderChart([]);
+    return;
+  }
+
+  // Stats
+  const now = new Date();
+  const curHour = now.getHours();
+  const totals = prices.map(p => getTotal(p.spot, p.hour));
+  const avgTotal = totals.reduce((a,b)=>a+b,0) / totals.length;
+  const minTotal = Math.min(...totals);
+  const minEntry = prices.find(p => getTotal(p.spot, p.hour) === minTotal);
+
+  // Current hour total
+  const curEntry = day === 'today' ? prices.find(p => p.hour === curHour) : null;
+  const curTotal = curEntry ? getTotal(curEntry.spot, curEntry.hour) : null;
+
+  const totalEl = document.getElementById('stat-total');
+  if (curTotal !== null) {
+    totalEl.textContent = curTotal.toFixed(1);
+    totalEl.className = 'stat-value ' + (curEntry && curEntry.spot < CONTRACT ? 'green' : 'red');
+    document.getElementById('stat-total-sub').textContent = 'snt/kWh (klo ' + pad(curHour) + ':00)';
+  } else {
+    totalEl.textContent = avgTotal.toFixed(1);
+    totalEl.className = 'stat-value';
+    document.getElementById('stat-total-sub').textContent = 'snt/kWh (keskim.)';
+  }
+  document.getElementById('stat-min').textContent = pad(minEntry.hour) + ':00';
+  document.getElementById('stat-min-sub').textContent = minTotal.toFixed(1) + ' snt/kWh';
+
+  renderChart(prices, avgTotal);
+
+  // Hour list
+  let html = '';
+  for (const p of prices) {
+    const total   = getTotal(p.spot, p.hour);
+    const isCheap = p.spot < CONTRACT;
+    const isCurrent = day === 'today' && p.hour === curHour;
+    const isNight = isNightHour(p.hour);
+    const diff = p.spot - CONTRACT;
+    const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+
+    const nightBadge = isNight ? '<span class="badge badge-night">Yösiirto</span>' : '';
+    const nowBadge   = isCurrent ? '<span class="badge badge-now">Nyt</span>' : '';
+
+    html += `<div class="hour-row ${isCheap?'cheap':'expensive'}${isCurrent?' current':''}">
+      <div class="hour-main">
+        <span class="hour-time">${pad(p.hour)}–${pad((p.hour+1)%24)}</span>
+        <div class="hour-prices">
+          <span class="hour-total ${isCheap?'green':'red'}">${total.toFixed(1)} snt <span style="font-size:11px;font-weight:400;color:var(--muted)">kok.</span></span>
+          <span class="hour-spot">Pörssi: ${p.spot.toFixed(1)} snt &nbsp;|&nbsp; <span class="${diff>=0?'':''}" style="color:${diff>=0?'#f87171':'#4ade80'}">${diffStr} vs 7,79</span></span>
+        </div>
+        ${nightBadge}${nowBadge}
+      </div>
+    </div>`;
+  }
+  document.getElementById('hour-list').innerHTML = html;
+  renderCheapList(prices);
+  if (day === 'today') {
+    setTimeout(() => {
+      const row = document.querySelector('.hour-row.current');
+      if (row) row.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }, 100);
+  }
+}
+
+function renderChart(prices, avgTotal) {
+  if (chartInstance) { chartInstance.destroy(); chartInstance = null; }
+  if (!prices.length) return;
+
+  const useTotal = viewMode === 'total';
+  const vals = prices.map(p => useTotal ? getTotal(p.spot, p.hour) : p.spot);
+  const avg  = avgTotal || (vals.reduce((a,b)=>a+b,0)/vals.length);
+
+  const bgColors = prices.map((p, i) => {
+    if (isNightHour(p.hour)) return 'rgba(129,140,248,0.45)';
+    return p.spot < CONTRACT ? '#4ade80' : '#f87171';
+  });
+
+  // Reference line
+  const refVal  = useTotal ? (CONTRACT + DAY_XFER_VAT) : CONTRACT;
+  const refLabel = useTotal ? 'Sopimus+siirto+vero' : 'Sopimushinta 7,79';
+
+  chartInstance = new Chart(document.getElementById('priceChart'), {
+    type: 'bar',
+    data: {
+      labels: prices.map(p => pad(p.hour)),
+      datasets: [
+        { data: vals.map(v => parseFloat(v.toFixed(2))), backgroundColor: bgColors, borderRadius: 3, borderSkipped: false, order: 1 },
+        { type: 'line', data: prices.map(() => parseFloat(refVal.toFixed(2))),
+          borderColor: 'rgba(129,140,248,0.7)', borderWidth: 2, borderDash: [4,3],
+          pointRadius: 0, fill: false, order: 0 }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          backgroundColor: '#1e2130', titleColor: '#9ca3af', bodyColor: '#f0f0f0',
+          borderColor: 'rgba(255,255,255,0.08)', borderWidth: 1,
+          callbacks: { label: ctx => ctx.datasetIndex === 0
+            ? ctx.parsed.y.toFixed(1) + ' snt/kWh'
+            : refLabel + ': ' + refVal.toFixed(1) + ' snt' }
+        }
+      },
+      scales: {
+        x: { ticks: { color: '#4b5563', font: { size: 10, family: 'DM Mono' }, autoSkip: true, maxTicksLimit: 12 }, grid: { display: false }, border: { display: false } },
+        y: { ticks: { color: '#4b5563', font: { size: 10, family: 'DM Mono' }, callback: v => v.toFixed(0) }, grid: { color: 'rgba(255,255,255,0.04)' }, border: { display: false } }
+      }
+    }
+  });
+}
+
+function renderCheapList(prices) {
+  const now = new Date();
+  const curHour = now.getHours();
+  const sorted = [...prices].sort((a,b) => a.spot - b.spot).slice(0,5);
+  // Sort by hour for display
+  sorted.sort((a,b) => a.hour - b.hour);
+  let html = '<div class="cheap-summary">';
+  for (const p of sorted) {
+    const total = getTotal(p.spot, p.hour);
+    const isCurrent = currentDay === 'today' && p.hour === curHour;
+    const diff = p.spot - CONTRACT;
+    const diffStr = (diff >= 0 ? '+' : '') + diff.toFixed(1);
+    html += `<div class="cheap-chip${isCurrent ? ' current' : ''}">
+      <span class="cheap-chip-time">${pad(p.hour)}:00${isCurrent ? ' ← nyt' : ''}</span>
+      <span class="cheap-chip-price">Pörssi: ${p.spot.toFixed(1)} snt</span>
+      <span class="cheap-chip-price" style="color:${diff<0?'#4ade80':'#f87171'}">${diffStr} vs 7,79</span>
+      <span class="cheap-chip-total">Yht: ${total.toFixed(1)} snt/kWh</span>
+    </div>`;
+  }
+  html += '</div>';
+  document.getElementById('cheap-list').innerHTML = html;
+}
+
+function showDay(day) {
+  currentDay = day;
+  document.getElementById('tab-today').classList.toggle('active', day === 'today');
+  document.getElementById('tab-tomorrow').classList.toggle('active', day === 'tomorrow');
+  renderDay(day);
+}
+
+// ── INIT ───────────────────────────────────────────────────
+registerSW();
+updateNotifBtn();
+fetchPrices();
+setInterval(fetchPrices, 10 * 60 * 1000);
+</script>
+</body>
+</html>
